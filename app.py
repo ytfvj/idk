@@ -32,6 +32,7 @@ if "secret_number" not in st.session_state:
     st.session_state.monster_type = ""
     st.session_state.qte_1_clicked = False
     st.session_state.qte_2_clicked = False
+    st.session_state.attack_count = 0  # 紀錄目前是第幾次攻擊
 
 
 # 各模式初始化功能
@@ -46,6 +47,7 @@ def init_normal_mode():
     st.session_state.time_limit = float("inf") 
     st.session_state.start_time = None
     st.session_state.lives = float("inf")
+    st.session_state.attack_count = 0
 
 
 def init_hell_mode():
@@ -78,7 +80,7 @@ def init_chaos_mode():
     st.session_state.lives = float("inf")
 
 
-# 👹 1x1x1x1 模式：生命 12，加入長條雙綠條 QTE 防禦機制！
+# 👹 1x1x1x1 模式：生命改回 1 條，但一局只會遭遇 12 次攻擊！
 def init_monster_mode():
     st.session_state.secret_number = random.randint(1, 110)  
     st.session_state.min_val = 1
@@ -88,7 +90,8 @@ def init_monster_mode():
     st.session_state.monster_type = random.choice(["實驗體-01", "未知生命體", "1x1x1x1觀測者"])
     st.session_state.time_limit = 60
     st.session_state.start_time = time.time()
-    st.session_state.lives = 12.0  
+    st.session_state.lives = 1.0  # 🔴 只有 1 條命，受傷即死
+    st.session_state.attack_count = 1  # 從第 1 次攻擊開始
     st.session_state.qte_1_clicked = False
     st.session_state.qte_2_clicked = False
 
@@ -124,28 +127,26 @@ with col1:
     st.markdown(f"### ⏳ **剩餘時間：{time_left_str}**")
     
     if st.session_state.mode_color == "green":
-        st.markdown(f"### 🟢 **【1x1x1x1 綠色警戒】猜測機會：`inf` | 剩餘護盾：` {st.session_state.lives} / 12 `**")
-        st.progress(max(0.0, min(st.session_state.lives / 12.0, 1.0)))
+        st.markdown(f"### 🔴 **【1x1x1x1 綠色警戒】生命值：` ❤️ 1 / 1 (一觸即死) ` | 突襲進度：` {st.session_state.attack_count} / 12 ` 次**")
+        st.progress(st.session_state.attack_count / 12.0)
     else:
         st.markdown(f"### ⏳ **猜測機會：`inf` (無限次)**")
 
-    # 🟢 🟢 核心 QTE 機制渲染區
+    # 🟢 🟢 QTE 機制區
     if st.session_state.mode_color == "green" and st.session_state.monster_active:
-        st.error(f"🚨 **[生物突襲] {st.session_state.monster_type} 正在瘋狂撕咬防線！**")
+        st.error(f"🚨 **[生物突襲] {st.session_state.monster_type} 發動第 {st.session_state.attack_count} 次攻擊！**")
         
-        # 視覺長條圖
         st.markdown("**【防禦解鎖進度條】**")
         qte_progress = 0.0
         if st.session_state.qte_1_clicked: qte_progress += 0.5
         if st.session_state.qte_2_clicked: qte_progress += 0.5
         st.progress(qte_progress)
 
-        # 渲染兩個綠色小條（安全按鈕）
         q_col1, q_col2, q_col3 = st.columns([1, 1, 2])
         
         with q_col1:
             if not st.session_state.qte_1_clicked:
-                if st.button("🟢 安全鎖 A (點擊)", key="qte_a", use_container_width=True):
+                if st.button("🟢 安全鎖 A", key="qte_a", use_container_width=True):
                     st.session_state.qte_1_clicked = True
                     st.rerun()
             else:
@@ -153,36 +154,41 @@ with col1:
 
         with q_col2:
             if not st.session_state.qte_2_clicked:
-                if st.button("🟢 安全鎖 B (點擊)", key="qte_b", use_container_width=True):
+                if st.button("🟢 安全鎖 B", key="qte_b", use_container_width=True):
                     st.session_state.qte_2_clicked = True
                     st.rerun()
             else:
                 st.button("✅ 鎖定成功", key="qte_b_dis", disabled=True, use_container_width=True)
                 
         with q_col3:
-            # 💡 此處已將原先報錯的 variant="primary" 修正為 type="primary"
             if st.button("🏃‍♂️ 完美迴避 (解鎖後點擊)", key="qte_submit", type="primary", use_container_width=True):
-                # 判定按到了幾個綠色小條
                 clicked_count = sum([st.session_state.qte_1_clicked, st.session_state.qte_2_clicked])
                 
                 if clicked_count == 2:
-                    st.success("✨ 完美迴避！成功無傷躲開怪物！")
-                elif clicked_count == 1:
-                    st.session_state.lives -= 0.5
-                    st.warning("⚠️ 擦傷！僅解開一個綠條，護盾扣除 0.5 滴血！")
+                    st.success("✨ 完美迴避！成功躲過這波攻擊！")
+                    st.session_state.monster_active = False
+                    
+                    # 檢查是否已經撐過 12 次攻擊
+                    if st.session_state.attack_count >= 12:
+                        st.balloons()
+                        st.success(f"🏆 奇蹟！你成功在怪物的 12 次瘋狂攻擊中活了下來！通關成功！密碼曾是 {st.session_state.secret_number}")
+                        st.session_state.leaderboard.append({
+                            "玩家": "生存大師", "模式": "🟢1x1x1x1", "耗時 (秒)": round(time.time() - st.session_state.start_time, 2), "次數 (次)": st.session_state.guess_count
+                        })
+                        init_normal_mode()
+                        st.session_state.game_cleared = True
+                    else:
+                        # 進到下一次攻擊波數
+                        st.session_state.attack_count += 1
+                        
+                    st.session_state.qte_1_clicked = False
+                    st.session_state.qte_2_clicked = False
+                    st.rerun()
                 else:
-                    st.session_state.lives -= 1.0
-                    st.error("💥 慘敗！完全沒解開綠條，護盾扣除 1.0 滴血！")
-                
-                # 重置 QTE 狀態並重整
-                st.session_state.monster_active = False
-                st.session_state.qte_1_clicked = False
-                st.session_state.qte_2_clicked = False
-                
-                if st.session_state.lives <= 0:
-                    st.error("💥 護盾已被完全撕裂，挑戰失敗！")
+                    # 只要沒按滿兩個綠條，不論按一個還是沒按，因為只有 1 條命，直接暴斃 Game Over
+                    st.error("💥 防護崩潰！你被怪物撕碎了。挑戰失敗！")
                     init_normal_mode()
-                st.rerun()
+                    st.rerun()
 
     st.markdown("---")
 
@@ -199,15 +205,10 @@ with col1:
             st.session_state.start_time = time.time()
             st.rerun()
 
-        # 如果怪物還在卻直接強行猜數字，視同 QTE 完全失敗，直接扣 1 滴血
+        # 怪物還在卻強行猜數字，直接被秒殺
         if st.session_state.mode_color == "green" and st.session_state.monster_active:
-            st.session_state.lives -= 1.0
-            st.error(f"💥 忽視警告！遭到 {st.session_state.monster_type} 正面重擊，扣除 1 滴血！")
-            st.session_state.monster_active = False
-            st.session_state.qte_1_clicked = False
-            st.session_state.qte_2_clicked = False
-            if st.session_state.lives <= 0:
-                init_normal_mode()
+            st.error("💥 你忽視了迎面撲來的怪物！直接被秒殺，挑戰失敗！")
+            init_normal_mode()
             st.rerun()
 
         try:
@@ -244,16 +245,10 @@ with col1:
                 else:
                     elapsed_time = "無限制模式"
 
-                current_mode_name = "一般"
-                if st.session_state.mode_color == "purple": current_mode_name = "地獄"
-                elif st.session_state.mode_color == "blue": current_mode_name = "顛倒"
-                elif st.session_state.mode_color == "orange": current_mode_name = "混沌"
-                elif st.session_state.mode_color == "green": current_mode_name = "🟢1x1x1x1"
-
                 st.success(f"通關成功！密碼為 {st.session_state.secret_number}。\n\n⏱️ 耗時：{elapsed_time} | 🎯 行動次數：{st.session_state.guess_count} 次")
 
                 st.session_state.leaderboard.append({
-                    "玩家": player_name, "模式": current_mode_name, "耗時 (秒)": elapsed_time if type(elapsed_time)==float else 999, "次數 (次)": st.session_state.guess_count
+                    "玩家": player_name, "模式": "🟢1x1x1x1" if st.session_state.mode_color == "green" else "一般", "耗時 (秒)": elapsed_time if type(elapsed_time)==float else 999, "次數 (次)": st.session_state.guess_count
                 })
                 init_normal_mode()
                 st.session_state.game_cleared = True
@@ -268,15 +263,13 @@ with col1:
 
         except ValueError:
             if st.session_state.mode_color == "green":
-                st.session_state.lives -= 1.0
-                st.error("💥 核心資料格式出錯，系統精神反噬扣除 1 滴血。")
-                if st.session_state.lives <= 0:
-                    init_normal_mode()
+                st.error("💥 核心格式異常引發精神反噬，直接暴斃。")
+                init_normal_mode()
                 st.rerun()
             else:
                 st.error("❌ 請輸入正確的數字。")
 
-        # 🟢 猜完之後刷新下一波怪物與 QTE
+        # 猜完之後如果還在綠色警戒模式，立刻觸發怪物的下一波攻擊
         if st.session_state.mode_color == "green" and not st.session_state.game_cleared:
             st.session_state.monster_active = True
             st.session_state.monster_type = random.choice(["實驗體-01", "未知生命體", "1x1x1x1觀測者"])
