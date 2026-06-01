@@ -1,16 +1,15 @@
 import random
-import time
 import pandas as pd
 import streamlit as st
 
 # ==========================================
-# 1. 網頁基本設定
+# 1. 網頁基本設定（已移除「時空」字眼）
 # ==========================================
 st.set_page_config(
-    page_title="終極密碼：時空局限版", page_icon="⏳", layout="wide"
+    page_title="終極密碼", page_icon="🔢", layout="wide"
 )
 
-st.title("🔢 終極密碼：時空局限版")
+st.title("🔢 終極密碼")
 
 # 初始化遊戲狀態
 if "secret_number" not in st.session_state:
@@ -22,13 +21,11 @@ if "secret_number" not in st.session_state:
     st.session_state.game_cleared = False
     st.session_state.leaderboard = []
 
-    # ⏳ 初始設定
-    st.session_state.time_limit = float("inf")  
-    st.session_state.start_time = None
+    # 🎯 初始設定猜測次數
     st.session_state.max_guesses = float("inf")  # 一般模式無限次
 
 
-# 各模式初始化功能
+# 各模式初始化功能（已全面拔除時間與計時狀態）
 def init_normal_mode():
     st.session_state.secret_number = random.randint(1, 100)
     st.session_state.min_val = 1
@@ -36,8 +33,6 @@ def init_normal_mode():
     st.session_state.mode_color = "black"
     st.session_state.guess_count = 0
     st.session_state.game_cleared = False
-    st.session_state.time_limit = float("inf") 
-    st.session_state.start_time = None
     st.session_state.max_guesses = float("inf")
 
 
@@ -46,8 +41,8 @@ def init_hell_mode():
     st.session_state.min_val = 1
     st.session_state.max_val = 999
     st.session_state.mode_color = "purple"
-    st.session_state.time_limit = float("inf")  # 拔除時間
-    st.session_state.start_time = None  
+    st.session_state.guess_count = 0
+    st.session_state.game_cleared = False
     st.session_state.max_guesses = float("inf")
 
 
@@ -56,8 +51,8 @@ def init_reverse_mode():
     st.session_state.min_val = -999
     st.session_state.max_val = 100
     st.session_state.mode_color = "blue"
-    st.session_state.time_limit = float("inf")  # 拔除時間
-    st.session_state.start_time = None
+    st.session_state.guess_count = 0
+    st.session_state.game_cleared = False
     st.session_state.max_guesses = float("inf")
 
 
@@ -66,25 +61,24 @@ def init_chaos_mode():
     st.session_state.min_val = -999
     st.session_state.max_val = 999
     st.session_state.mode_color = "orange"
-    st.session_state.time_limit = float("inf")  # 拔除時間
-    st.session_state.start_time = None
+    st.session_state.guess_count = 0
+    st.session_state.game_cleared = False
     st.session_state.max_guesses = float("inf")
 
 
-# 👹 1x1x1x1 模式：無時間限制，但只有 8 次猜測機會！
+# 👹 1x1x1x1 模式：無時間限制，嚴格限制 8 次猜測機會！
 def init_monster_mode():
     st.session_state.secret_number = random.randint(1, 110)  
     st.session_state.min_val = 1
     st.session_state.max_val = 110  
     st.session_state.mode_color = "green"  
-    st.session_state.time_limit = float("inf")  # ⏳ 完全拔除時間
-    st.session_state.start_time = None
     st.session_state.guess_count = 0
-    st.session_state.max_guesses = 8  # 🎯 嚴格限制 8 次機會
+    st.session_state.game_cleared = False
+    st.session_state.max_guesses = 8  # 🎯 限制 8 次機會
 
 
 # ==========================================
-# 3. 網頁版面配置
+# 2. 網頁版面配置
 # ==========================================
 col1, col2 = st.columns([2, 1])
 
@@ -94,16 +88,13 @@ with col1:
     # 顯示目前範圍
     st.subheader(f"目前範圍： :blue[{st.session_state.min_val}] ~ :red[{st.session_state.max_val}]")
 
-    # 狀態面板
+    # 狀態面板（已徹底移除時間文字顯示）
     if st.session_state.mode_color == "green":
-        st.markdown("### ⏳ **【1x1x1x1 模式】時間：無限制 (放輕鬆算)**")
-        
         # 計算與顯示剩餘幾次機會
         guesses_left = st.session_state.max_guesses - st.session_state.guess_count
-        st.markdown(f"### 🎯 **剩餘機會：:red[{guesses_left} / 8] 次**")
+        st.markdown(f"### 🎯 **【1x1x1x1 模式】剩餘機會：:red[{guesses_left} / 8] 次**")
         st.progress(guesses_left / 8.0)
     else:
-        st.markdown("### ⏳ **時間：無限制**")
         st.markdown(f"### 🎯 **目前已猜次數：{st.session_state.guess_count} 次**")
         
     st.markdown("---")
@@ -121,7 +112,7 @@ with col1:
             guess = int(user_action)
             st.session_state.guess_count += 1
 
-            # 彩蛋觸發區
+            # 彩蛋觸發區（必須在未變動的 1~100 初始狀態下）
             if st.session_state.min_val == 1 and st.session_state.max_val == 100 and st.session_state.mode_color == "black":
                 if guess == 999:
                     init_hell_mode()
@@ -152,8 +143,11 @@ with col1:
                 
                 st.success(f"通關成功！密碼為 {st.session_state.secret_number}。\n\n🎯 總共花費次數：{st.session_state.guess_count} 次！")
 
+                # 排行榜欄位同步拔除耗時，只保留次數
                 st.session_state.leaderboard.append({
-                    "玩家": player_name, "模式": "🟢1x1x1x1" if st.session_state.mode_color == "green" else "一般", "耗時 (秒)": "無限制", "次數 (次)": st.session_state.guess_count
+                    "玩家": player_name, 
+                    "模式": "🟢1x1x1x1" if st.session_state.mode_color == "green" else "一般", 
+                    "次數 (次)": st.session_state.guess_count
                 })
                 init_normal_mode()
                 st.session_state.game_cleared = True
@@ -179,12 +173,11 @@ with col1:
         init_normal_mode()
         st.rerun()
 
-# --- 右側：榮譽排行榜區 ---
+# --- 右側：榮譽排行榜區（完全移除時間排行） ---
 with col2:
     st.header("🏆 榮譽排行榜 (Top 15)")
     if len(st.session_state.leaderboard) > 0:
         df = pd.DataFrame(st.session_state.leaderboard)
-        # 因為沒時間，所以排行榜這邊主要以看次數為主
         st.subheader("🎯 精準次數榜")
         df_count = df.sort_values(by="次數 (次)").head(15).reset_index(drop=True)
         df_count.index = df_count.index + 1
