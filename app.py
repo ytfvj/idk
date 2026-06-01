@@ -22,14 +22,16 @@ if "secret_number" not in st.session_state:
     st.session_state.game_cleared = False
     st.session_state.leaderboard = []
 
-    # ⏳ 初始時間與生命設定（普通模式時間無限）
+    # ⏳ 初始時間與生命設定
     st.session_state.time_limit = float("inf")  
     st.session_state.start_time = None
     st.session_state.lives = float("inf")  
 
-    # 👹 怪物模式專用狀態
+    # 👹 怪物模式與 QTE 專用狀態
     st.session_state.monster_active = False  
     st.session_state.monster_type = ""
+    st.session_state.qte_1_clicked = False
+    st.session_state.qte_2_clicked = False
 
 
 # 各模式初始化功能
@@ -51,7 +53,6 @@ def init_hell_mode():
     st.session_state.min_val = 1
     st.session_state.max_val = 999
     st.session_state.mode_color = "purple"
-    st.session_state.game_msg = "已進入地獄模式。時間限制 60 秒，機會無限。"
     st.session_state.time_limit = 60
     st.session_state.start_time = time.time()  
     st.session_state.lives = float("inf")
@@ -62,7 +63,6 @@ def init_reverse_mode():
     st.session_state.min_val = -999
     st.session_state.max_val = 100
     st.session_state.mode_color = "blue"
-    st.session_state.game_msg = "已進入顛倒世界。時間限制 60 秒，機會無限。"
     st.session_state.time_limit = 60
     st.session_state.start_time = time.time()
     st.session_state.lives = float("inf")
@@ -73,13 +73,12 @@ def init_chaos_mode():
     st.session_state.min_val = -999
     st.session_state.max_val = 999
     st.session_state.mode_color = "orange"
-    st.session_state.game_msg = "已進入混沌宇宙。時間限制 60 秒，機會無限。"
     st.session_state.time_limit = 60
     st.session_state.start_time = time.time()
     st.session_state.lives = float("inf")
 
 
-# 👹 1x1x1x1 模式：範圍 1 ~ 110，【答案保密】，考驗一邊猜測、一邊按 R 閃避
+# 👹 1x1x1x1 模式：生命 12，加入長條雙綠條 QTE 防禦機制！
 def init_monster_mode():
     st.session_state.secret_number = random.randint(1, 110)  
     st.session_state.min_val = 1
@@ -87,10 +86,11 @@ def init_monster_mode():
     st.session_state.mode_color = "green"  
     st.session_state.monster_active = True
     st.session_state.monster_type = random.choice(["實驗體-01", "未知生命體", "1x1x1x1觀測者"])
-    st.session_state.game_msg = "已進入 1x1x1x1 模式。範圍 1 ~ 110。密碼已完全加密，請在躲避生物（按 R）的同時進行猜測！"
     st.session_state.time_limit = 60
     st.session_state.start_time = time.time()
-    st.session_state.lives = 3
+    st.session_state.lives = 12.0  # 支援扣 0.5 滴血
+    st.session_state.qte_1_clicked = False
+    st.session_state.qte_2_clicked = False
 
 
 # ==========================================
@@ -124,21 +124,63 @@ with col1:
     st.markdown(f"### ⏳ **剩餘時間：{time_left_str}**")
     
     if st.session_state.mode_color == "green":
-        st.markdown(f"### 🟢 **【1x1x1x1 綠色警戒】猜測機會：`inf` | 生命防護：{'❤️' * st.session_state.lives}**")
+        st.markdown(f"### 🟢 **【1x1x1x1 綠色警戒】猜測機會：`inf` | 剩餘護盾：` {st.session_state.lives} / 12 `**")
+        st.progress(max(0.0, min(st.session_state.lives / 12.0, 1.0)))
     else:
         st.markdown(f"### ⏳ **猜測機會：`inf` (無限次)**")
 
-    # 🟢 綠色警戒機制（移除 st.code 密碼明牌顯示）
-    if st.session_state.mode_color == "green":
-        if st.session_state.monster_active:
-            st.success(
-                f"🟢 **[綠色警戒] 生物突襲警告：{st.session_state.monster_type} 已接近。**\n\n"
-                "請先在下方按下「按 R 避開」或輸入 R 送出。若直接進行數字猜測將會受到攻擊。"
-            )
+    # 🟢 🟢 核心 QTE 機制渲染區
+    if st.session_state.mode_color == "green" and st.session_state.monster_active:
+        st.error(f"🚨 **[生物突襲] {st.session_state.monster_type} 正在瘋狂撕咬防線！**")
+        
+        # 視覺長條圖
+        st.markdown("**【防禦解鎖進度條】**")
+        qte_progress = 0.0
+        if st.session_state.qte_1_clicked: qte_progress += 0.5
+        if st.session_state.qte_2_clicked: qte_progress += 0.5
+        st.progress(qte_progress)
 
-            if st.button("🏃‍♂️ 按 R 避開", key="r_button"):
-                st.success(f"確認迴避。已成功避開 {st.session_state.monster_type}。")
-                st.session_state.monster_active = False  
+        # 渲染兩個綠色小條（安全按鈕）
+        q_col1, q_col2, q_col3 = st.columns([1, 1, 2])
+        
+        with q_col1:
+            if not st.session_state.qte_1_clicked:
+                if st.button("🟢 安全鎖 A (點擊)", key="qte_a", use_container_width=True):
+                    st.session_state.qte_1_clicked = True
+                    st.rerun()
+            else:
+                st.button("✅ 鎖定成功", key="qte_a_dis", disabled=True, use_container_width=True)
+
+        with q_col2:
+            if not st.session_state.qte_2_clicked:
+                if st.button("🟢 安全鎖 B (點擊)", key="qte_b", use_container_width=True):
+                    st.session_state.qte_2_clicked = True
+                    st.rerun()
+            else:
+                st.button("✅ 鎖定成功", key="qte_b_dis", disabled=True, use_container_width=True)
+                
+        with q_col3:
+            if st.button("🏃‍♂️ 完美迴避 (解鎖後點擊)", key="qte_submit", variant="primary", use_container_width=True):
+                # 判定按到了幾個綠色小條
+                clicked_count = sum([st.session_state.qte_1_clicked, st.session_state.qte_2_clicked])
+                
+                if clicked_count == 2:
+                    st.success("✨ 完美迴避！成功無傷躲開怪物！")
+                elif clicked_count == 1:
+                    st.session_state.lives -= 0.5
+                    st.warning("⚠️ 擦傷！僅解開一個綠條，護盾扣除 0.5 滴血！")
+                else:
+                    st.session_state.lives -= 1.0
+                    st.error("💥 慘敗！完全沒解開綠條，護盾扣除 1.0 滴血！")
+                
+                # 重置 QTE 狀態並重整
+                st.session_state.monster_active = False
+                st.session_state.qte_1_clicked = False
+                st.session_state.qte_2_clicked = False
+                
+                if st.session_state.lives <= 0:
+                    st.error("💥 護盾已被完全撕裂，挑戰失敗！")
+                    init_normal_mode()
                 st.rerun()
 
     st.markdown("---")
@@ -146,7 +188,7 @@ with col1:
     # 遊戲輸入表單
     with st.form(key="guess_form", clear_on_submit=True):
         player_name = st.text_input("請輸入你的暱稱：", value="匿名玩家")
-        guess_input = st.text_input("請輸入你的猜測（或輸入 R 進行閃避）：", placeholder="填入數字或指令...")
+        guess_input = st.text_input("請輸入你的猜測：", placeholder="填入數字...")
         submit_button = st.form_submit_button(label="確認送出")
 
     if submit_button:
@@ -156,31 +198,22 @@ with col1:
             st.session_state.start_time = time.time()
             st.rerun()
 
-        # 處理綠色警戒模式下的行動
-        if st.session_state.mode_color == "green":
-            if user_action.upper() == "R":
-                if st.session_state.monster_active:
-                    st.success(f"確認迴避。已成功避開 {st.session_state.monster_type}。")
-                    st.session_state.monster_active = False
-                else:
-                    st.warning("目前並未偵測到生物威脅。")
-                st.rerun()
-
-            elif st.session_state.monster_active:
-                st.session_state.lives -= 1
-                st.error(f"迴避失敗。受到 {st.session_state.monster_type} 攻擊，扣除一條命。")
-                st.session_state.monster_active = False
-
-                if st.session_state.lives <= 0:
-                    st.error("防護已歸零，系統判定強制終止。")
-                    init_normal_mode()
-                st.rerun()
+        # 如果怪物還在卻直接強行猜數字，視同 QTE 完全失敗，直接扣 1 滴血
+        if st.session_state.mode_color == "green" and st.session_state.monster_active:
+            st.session_state.lives -= 1.0
+            st.error(f"💥 忽視警告！遭到 {st.session_state.monster_type} 正面重擊，扣除 1 滴血！")
+            st.session_state.monster_active = False
+            st.session_state.qte_1_clicked = False
+            st.session_state.qte_2_clicked = False
+            if st.session_state.lives <= 0:
+                init_normal_mode()
+            st.rerun()
 
         try:
             guess = int(user_action)
             st.session_state.guess_count += 1
 
-            # 彩蛋觸發區（必須在未變動的 1~100 初始狀態下）
+            # 彩蛋觸發區
             if st.session_state.min_val == 1 and st.session_state.max_val == 100 and st.session_state.mode_color == "black":
                 if guess == 999:
                     init_hell_mode()
@@ -195,7 +228,7 @@ with col1:
                     init_monster_mode()
                     st.rerun()
 
-            # 🛑 核心檢查：如果輸入超出範圍
+            # 檢查範圍
             if guess < st.session_state.min_val or guess > st.session_state.max_val:
                 st.warning(f"注意：請輸入 {st.session_state.min_val} 到 {st.session_state.max_val} 之間的數字。")
                 st.rerun()
@@ -228,37 +261,30 @@ with col1:
             else:
                 if guess > st.session_state.secret_number:
                     st.session_state.max_val = guess
-                    st.session_state.game_msg = "提示：偏大。"
                 else:
                     st.session_state.min_val = guess
-                    st.session_state.game_msg = "提示：偏小。"
                 st.rerun()
 
         except ValueError:
             if st.session_state.mode_color == "green":
-                st.session_state.lives -= 1
-                st.error("輸入格式錯誤，防護受到未知精神干擾，扣除一條命。")
+                st.session_state.lives -= 1.0
+                st.error("💥 核心資料格式出錯，系統精神反噬扣除 1 滴血。")
                 if st.session_state.lives <= 0:
                     init_normal_mode()
                 st.rerun()
             else:
                 st.error("❌ 請輸入正確的數字。")
 
-        # 🟢 綠色警戒專用生物刷新機制
+        # 🟢 猜完之後刷新下一波怪物與 QTE
         if st.session_state.mode_color == "green" and not st.session_state.game_cleared:
             st.session_state.monster_active = True
             st.session_state.monster_type = random.choice(["實驗體-01", "未知生命體", "1x1x1x1觀測者"])
+            st.session_state.qte_1_clicked = False
+            st.session_state.qte_2_clicked = False
             st.rerun()
 
     if st.session_state.game_cleared:
-        st.warning(
-            "🎁 **【通關隱藏彩蛋解鎖】**\n\n"
-            "已確認以下平行宇宙入口指令，可於一般模式第一猜輸入：\n"
-            "* 輸入 **999** ➡️ 進入【地獄模式 (1 ~ 999)】(限時60秒)\n"
-            "* 輸入 **-999** ➡️ 進入【顛倒世界 (-999 ~ 100)】(限時60秒)\n"
-            "* 輸入 **1000** ➡️ 進入【混沌宇宙 (-999 ~ 999)】(限時60秒)\n"
-            "* 輸入 **666** ➡️ 進入【1x1x1x1 綠色警戒】(限時60秒，範圍 1 ~ 110 加密盲猜，無限次機會但僅有 3 條命，需配合 R 鍵迴避)"
-        )
+        st.warning("🎁 **【隱藏彩蛋解鎖】第一猜輸入 666 即可開啟 1x1x1x1 雙綠條極限生存戰！**")
 
     if st.button("重新開始遊戲"):
         init_normal_mode()
@@ -282,4 +308,3 @@ with col2:
             st.dataframe(df_count, use_container_width=True)
     else:
         st.info("目前尚無紀錄。")
-
