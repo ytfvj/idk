@@ -88,7 +88,7 @@ def init_monster_mode():
     st.session_state.monster_type = random.choice(["實驗體-01", "未知生命體", "1x1x1x1觀測者"])
     st.session_state.time_limit = 60
     st.session_state.start_time = time.time()
-    st.session_state.lives = 12.0  # 支援扣 0.5 滴血
+    st.session_state.lives = 12.0  
     st.session_state.qte_1_clicked = False
     st.session_state.qte_2_clicked = False
 
@@ -160,7 +160,8 @@ with col1:
                 st.button("✅ 鎖定成功", key="qte_b_dis", disabled=True, use_container_width=True)
                 
         with q_col3:
-            if st.button("🏃‍♂️ 完美迴避 (解鎖後點擊)", key="qte_submit", variant="primary", use_container_width=True):
+            # 💡 此處已將原先報錯的 variant="primary" 修正為 type="primary"
+            if st.button("🏃‍♂️ 完美迴避 (解鎖後點擊)", key="qte_submit", type="primary", use_container_width=True):
                 # 判定按到了幾個綠色小條
                 clicked_count = sum([st.session_state.qte_1_clicked, st.session_state.qte_2_clicked])
                 
@@ -282,9 +283,6 @@ with col1:
             st.session_state.qte_1_clicked = False
             st.session_state.qte_2_clicked = False
             st.rerun()
-
-    if st.session_state.game_cleared:
-        st.warning("🎁 **【隱藏彩蛋解鎖】第一猜輸入 666 即可開啟 1x1x1x1 雙綠條極限生存戰！**")
 
     if st.button("重新開始遊戲"):
         init_normal_mode()
