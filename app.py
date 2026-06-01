@@ -22,17 +22,10 @@ if "secret_number" not in st.session_state:
     st.session_state.game_cleared = False
     st.session_state.leaderboard = []
 
-    # ⏳ 初始時間與生命設定
+    # ⏳ 初始設定
     st.session_state.time_limit = float("inf")  
     st.session_state.start_time = None
-    st.session_state.lives = float("inf")  
-
-    # 👹 怪物模式與 QTE 專用狀態
-    st.session_state.monster_active = False  
-    st.session_state.monster_type = ""
-    st.session_state.qte_1_clicked = False
-    st.session_state.qte_2_clicked = False
-    st.session_state.attack_count = 0  # 紀錄目前是第幾次攻擊
+    st.session_state.max_guesses = float("inf")  # 一般模式無限次
 
 
 # 各模式初始化功能
@@ -43,11 +36,9 @@ def init_normal_mode():
     st.session_state.mode_color = "black"
     st.session_state.guess_count = 0
     st.session_state.game_cleared = False
-    st.session_state.monster_active = False
     st.session_state.time_limit = float("inf") 
     st.session_state.start_time = None
-    st.session_state.lives = float("inf")
-    st.session_state.attack_count = 0
+    st.session_state.max_guesses = float("inf")
 
 
 def init_hell_mode():
@@ -55,9 +46,9 @@ def init_hell_mode():
     st.session_state.min_val = 1
     st.session_state.max_val = 999
     st.session_state.mode_color = "purple"
-    st.session_state.time_limit = 60
-    st.session_state.start_time = time.time()  
-    st.session_state.lives = float("inf")
+    st.session_state.time_limit = float("inf")  # 拔除時間
+    st.session_state.start_time = None  
+    st.session_state.max_guesses = float("inf")
 
 
 def init_reverse_mode():
@@ -65,9 +56,9 @@ def init_reverse_mode():
     st.session_state.min_val = -999
     st.session_state.max_val = 100
     st.session_state.mode_color = "blue"
-    st.session_state.time_limit = 60
-    st.session_state.start_time = time.time()
-    st.session_state.lives = float("inf")
+    st.session_state.time_limit = float("inf")  # 拔除時間
+    st.session_state.start_time = None
+    st.session_state.max_guesses = float("inf")
 
 
 def init_chaos_mode():
@@ -75,41 +66,21 @@ def init_chaos_mode():
     st.session_state.min_val = -999
     st.session_state.max_val = 999
     st.session_state.mode_color = "orange"
-    st.session_state.time_limit = 60
-    st.session_state.start_time = time.time()
-    st.session_state.lives = float("inf")
+    st.session_state.time_limit = float("inf")  # 拔除時間
+    st.session_state.start_time = None
+    st.session_state.max_guesses = float("inf")
 
 
-# 👹 1x1x1x1 模式：生命改回 1 條，但一局只會遭遇 12 次攻擊！
+# 👹 1x1x1x1 模式：無時間限制，但只有 8 次猜測機會！
 def init_monster_mode():
     st.session_state.secret_number = random.randint(1, 110)  
     st.session_state.min_val = 1
     st.session_state.max_val = 110  
     st.session_state.mode_color = "green"  
-    st.session_state.monster_active = True
-    st.session_state.monster_type = random.choice(["實驗體-01", "未知生命體", "1x1x1x1觀測者"])
-    st.session_state.time_limit = 60
-    st.session_state.start_time = time.time()
-    st.session_state.lives = 1.0  # 🔴 只有 1 條命，受傷即死
-    st.session_state.attack_count = 1  # 從第 1 次攻擊開始
-    st.session_state.qte_1_clicked = False
-    st.session_state.qte_2_clicked = False
-
-
-# ==========================================
-# 2. 計算與檢查剩餘時間
-# ==========================================
-time_left_str = "無限制"
-if st.session_state.start_time is not None and not st.session_state.game_cleared:
-    if st.session_state.time_limit != float("inf"):
-        elapsed = time.time() - st.session_state.start_time
-        time_left = max(0, int(st.session_state.time_limit - elapsed))
-        time_left_str = f"{time_left} 秒"
-
-        if time_left <= 0:
-            st.error(f"⌛ 時間耗盡！系統已強制重置。正確答案曾是：{st.session_state.secret_number}")
-            init_normal_mode()
-            st.rerun()
+    st.session_state.time_limit = float("inf")  # ⏳ 完全拔除時間
+    st.session_state.start_time = None
+    st.session_state.guess_count = 0
+    st.session_state.max_guesses = 8  # 🎯 嚴格限制 8 次機會
 
 
 # ==========================================
@@ -124,72 +95,17 @@ with col1:
     st.subheader(f"目前範圍： :blue[{st.session_state.min_val}] ~ :red[{st.session_state.max_val}]")
 
     # 狀態面板
-    st.markdown(f"### ⏳ **剩餘時間：{time_left_str}**")
-    
     if st.session_state.mode_color == "green":
-        st.markdown(f"### 🔴 **【1x1x1x1 綠色警戒】生命值：` ❤️ 1 / 1 (一觸即死) ` | 突襲進度：` {st.session_state.attack_count} / 12 ` 次**")
-        st.progress(st.session_state.attack_count / 12.0)
+        st.markdown("### ⏳ **【1x1x1x1 模式】時間：無限制 (放輕鬆算)**")
+        
+        # 計算與顯示剩餘幾次機會
+        guesses_left = st.session_state.max_guesses - st.session_state.guess_count
+        st.markdown(f"### 🎯 **剩餘機會：:red[{guesses_left} / 8] 次**")
+        st.progress(guesses_left / 8.0)
     else:
-        st.markdown(f"### ⏳ **猜測機會：`inf` (無限次)**")
-
-    # 🟢 🟢 QTE 機制區
-    if st.session_state.mode_color == "green" and st.session_state.monster_active:
-        st.error(f"🚨 **[生物突襲] {st.session_state.monster_type} 發動第 {st.session_state.attack_count} 次攻擊！**")
+        st.markdown("### ⏳ **時間：無限制**")
+        st.markdown(f"### 🎯 **目前已猜次數：{st.session_state.guess_count} 次**")
         
-        st.markdown("**【防禦解鎖進度條】**")
-        qte_progress = 0.0
-        if st.session_state.qte_1_clicked: qte_progress += 0.5
-        if st.session_state.qte_2_clicked: qte_progress += 0.5
-        st.progress(qte_progress)
-
-        q_col1, q_col2, q_col3 = st.columns([1, 1, 2])
-        
-        with q_col1:
-            if not st.session_state.qte_1_clicked:
-                if st.button("🟢 安全鎖 A", key="qte_a", use_container_width=True):
-                    st.session_state.qte_1_clicked = True
-                    st.rerun()
-            else:
-                st.button("✅ 鎖定成功", key="qte_a_dis", disabled=True, use_container_width=True)
-
-        with q_col2:
-            if not st.session_state.qte_2_clicked:
-                if st.button("🟢 安全鎖 B", key="qte_b", use_container_width=True):
-                    st.session_state.qte_2_clicked = True
-                    st.rerun()
-            else:
-                st.button("✅ 鎖定成功", key="qte_b_dis", disabled=True, use_container_width=True)
-                
-        with q_col3:
-            if st.button("🏃‍♂️ 完美迴避 (解鎖後點擊)", key="qte_submit", type="primary", use_container_width=True):
-                clicked_count = sum([st.session_state.qte_1_clicked, st.session_state.qte_2_clicked])
-                
-                if clicked_count == 2:
-                    st.success("✨ 完美迴避！成功躲過這波攻擊！")
-                    st.session_state.monster_active = False
-                    
-                    # 檢查是否已經撐過 12 次攻擊
-                    if st.session_state.attack_count >= 12:
-                        st.balloons()
-                        st.success(f"🏆 奇蹟！你成功在怪物的 12 次瘋狂攻擊中活了下來！通關成功！密碼曾是 {st.session_state.secret_number}")
-                        st.session_state.leaderboard.append({
-                            "玩家": "生存大師", "模式": "🟢1x1x1x1", "耗時 (秒)": round(time.time() - st.session_state.start_time, 2), "次數 (次)": st.session_state.guess_count
-                        })
-                        init_normal_mode()
-                        st.session_state.game_cleared = True
-                    else:
-                        # 進到下一次攻擊波數
-                        st.session_state.attack_count += 1
-                        
-                    st.session_state.qte_1_clicked = False
-                    st.session_state.qte_2_clicked = False
-                    st.rerun()
-                else:
-                    # 只要沒按滿兩個綠條，不論按一個還是沒按，因為只有 1 條命，直接暴斃 Game Over
-                    st.error("💥 防護崩潰！你被怪物撕碎了。挑戰失敗！")
-                    init_normal_mode()
-                    st.rerun()
-
     st.markdown("---")
 
     # 遊戲輸入表單
@@ -200,16 +116,6 @@ with col1:
 
     if submit_button:
         user_action = guess_input.strip()
-
-        if st.session_state.start_time is None and st.session_state.time_limit != float("inf"):
-            st.session_state.start_time = time.time()
-            st.rerun()
-
-        # 怪物還在卻強行猜數字，直接被秒殺
-        if st.session_state.mode_color == "green" and st.session_state.monster_active:
-            st.error("💥 你忽視了迎面撲來的怪物！直接被秒殺，挑戰失敗！")
-            init_normal_mode()
-            st.rerun()
 
         try:
             guess = int(user_action)
@@ -233,6 +139,10 @@ with col1:
             # 檢查範圍
             if guess < st.session_state.min_val or guess > st.session_state.max_val:
                 st.warning(f"注意：請輸入 {st.session_state.min_val} 到 {st.session_state.max_val} 之間的數字。")
+                # 超出範圍一樣算猜錯，檢查次數
+                if st.session_state.guess_count >= st.session_state.max_guesses:
+                    st.error(f"💥 次數耗盡！挑戰失敗。正確答案曾是：{st.session_state.secret_number}")
+                    init_normal_mode()
                 st.rerun()
 
             # 猜對了
@@ -240,21 +150,22 @@ with col1:
                 st.balloons()
                 st.session_state.game_cleared = True
                 
-                if st.session_state.start_time is not None:
-                    elapsed_time = round(time.time() - st.session_state.start_time, 2)
-                else:
-                    elapsed_time = "無限制模式"
-
-                st.success(f"通關成功！密碼為 {st.session_state.secret_number}。\n\n⏱️ 耗時：{elapsed_time} | 🎯 行動次數：{st.session_state.guess_count} 次")
+                st.success(f"通關成功！密碼為 {st.session_state.secret_number}。\n\n🎯 總共花費次數：{st.session_state.guess_count} 次！")
 
                 st.session_state.leaderboard.append({
-                    "玩家": player_name, "模式": "🟢1x1x1x1" if st.session_state.mode_color == "green" else "一般", "耗時 (秒)": elapsed_time if type(elapsed_time)==float else 999, "次數 (次)": st.session_state.guess_count
+                    "玩家": player_name, "模式": "🟢1x1x1x1" if st.session_state.mode_color == "green" else "一般", "耗時 (秒)": "無限制", "次數 (次)": st.session_state.guess_count
                 })
                 init_normal_mode()
                 st.session_state.game_cleared = True
 
             # 猜錯了
             else:
+                # 檢查次數是否用完了
+                if st.session_state.guess_count >= st.session_state.max_guesses:
+                    st.error(f"💥 次數耗盡！挑戰失敗。正確答案曾是：{st.session_state.secret_number}")
+                    init_normal_mode()
+                    st.rerun()
+                
                 if guess > st.session_state.secret_number:
                     st.session_state.max_val = guess
                 else:
@@ -262,20 +173,7 @@ with col1:
                 st.rerun()
 
         except ValueError:
-            if st.session_state.mode_color == "green":
-                st.error("💥 核心格式異常引發精神反噬，直接暴斃。")
-                init_normal_mode()
-                st.rerun()
-            else:
-                st.error("❌ 請輸入正確的數字。")
-
-        # 猜完之後如果還在綠色警戒模式，立刻觸發怪物的下一波攻擊
-        if st.session_state.mode_color == "green" and not st.session_state.game_cleared:
-            st.session_state.monster_active = True
-            st.session_state.monster_type = random.choice(["實驗體-01", "未知生命體", "1x1x1x1觀測者"])
-            st.session_state.qte_1_clicked = False
-            st.session_state.qte_2_clicked = False
-            st.rerun()
+            st.error("❌ 請輸入正確的數字。")
 
     if st.button("重新開始遊戲"):
         init_normal_mode()
@@ -286,16 +184,10 @@ with col2:
     st.header("🏆 榮譽排行榜 (Top 15)")
     if len(st.session_state.leaderboard) > 0:
         df = pd.DataFrame(st.session_state.leaderboard)
-        tab1, tab2 = st.tabs(["⏱️ 時間最快", "🎯 次數最少"])
-        with tab1:
-            st.subheader("⏱️ 秒數神速榜")
-            df_time = df.sort_values(by="耗時 (秒)").head(15).reset_index(drop=True)
-            df_time.index = df_time.index + 1
-            st.dataframe(df_time, use_container_width=True)
-        with tab2:
-            st.subheader("🎯 精準次數榜")
-            df_count = df.sort_values(by="次數 (次)").head(15).reset_index(drop=True)
-            df_count.index = df_count.index + 1
-            st.dataframe(df_count, use_container_width=True)
+        # 因為沒時間，所以排行榜這邊主要以看次數為主
+        st.subheader("🎯 精準次數榜")
+        df_count = df.sort_values(by="次數 (次)").head(15).reset_index(drop=True)
+        df_count.index = df_count.index + 1
+        st.dataframe(df_count, use_container_width=True)
     else:
         st.info("目前尚無紀錄。")
